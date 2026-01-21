@@ -54,7 +54,7 @@ cat > /config/scripts/.env << 'EOF'
 DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
 NIC_INTERFACE="eth1"
 EOF
-chmod 600 /config/scripts/.env
+chmod 644 /config/scripts/.env
 ```
 
 ### 4. 動作テスト
