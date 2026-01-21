@@ -1,0 +1,21 @@
+# Environment files (contains secrets)
+.env
+scripts/.env
+
+# State files
+*.state
+*-state
+
+# Local logs
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
