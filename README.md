@@ -6,7 +6,7 @@ VyOSルーター向け監視スクリプト集。Discord Webhookで通知。
 
 ## 構成
 
-```
+```text
 scripts/
 ├── discord-notify.sh   # Discord通知基盤
 ├── nic-monitor.sh      # NIC温度監視
@@ -19,7 +19,7 @@ scripts/
 ### NIC温度監視 (nic-monitor.sh)
 
 | 温度 | 状態 | アクション |
-|------|------|-----------|
+| ------ | ------ | ----------- |
 | <70℃ | 正常 | - |
 | 70-85℃ | 警告 | Discord通知 |
 | >85℃ | 危険 | Discord通知 + 速度1Gbps制限 |
@@ -37,7 +37,7 @@ scripts/
 ### 1. ファイル転送
 
 ```bash
-[Mac] scp -r scripts/ vyos@192.168.1.1:/config/scripts/
+[Mac] scp -r scripts/ vyos@192.168.x.x:/config/scripts/
 ```
 
 ### 2. 権限設定
@@ -49,7 +49,8 @@ scripts/
 ### 3. 環境変数設定
 
 ```bash
-[VyOS] cat > /config/scripts/.env << 'EOF'
+[VyOS]
+cat > /config/scripts/.env << 'EOF'
 DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
 NIC_INTERFACE="eth1"
 EOF
@@ -66,7 +67,8 @@ chmod 600 /config/scripts/.env
 ### 5. cron設定
 
 ```bash
-[VyOS] configure
+[VyOS]
+configure
 set system task-scheduler task nic-monitor interval 5m
 set system task-scheduler task nic-monitor executable path /config/scripts/nic-monitor.sh
 
@@ -82,7 +84,7 @@ save
 ### nic-monitor.sh
 
 | オプション | 説明 |
-|-----------|------|
+| ----------- | ------ |
 | (なし) | 温度監視実行 |
 | --test | 温度読み取りテスト |
 | --status | 現在の温度と状態表示 |
@@ -90,7 +92,7 @@ save
 ### log-monitor.sh
 
 | オプション | 説明 |
-|-----------|------|
+| ----------- | ------ |
 | (なし) | ログ監視実行 |
 | --status | 永続ログの状態表示 |
 | --tail | 永続ログをtail -f |
@@ -106,3 +108,4 @@ save
 - `/config/` 以下はVyOS再起動後も永続化される
 - 温度取得はIntel X540-T2 (ixgbe) を想定
 - sensorsコマンドがない場合は `/sys/class/hwmon` を使用
+
