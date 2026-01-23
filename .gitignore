@@ -19,3 +19,7 @@ scripts/.env
 # OS
 .DS_Store
 Thumbs.db
+
+# Build output
+bin/
+pervigil-bot
