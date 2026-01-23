@@ -14,6 +14,15 @@ scripts/
 ├── nic-monitor.sh      # NIC温度監視 → discord-notify.sh依存
 ├── log-monitor.sh      # syslogエラー監視 → discord-notify.sh依存
 └── .env                # シークレット (DISCORD_WEBHOOK_URL, NIC_INTERFACE)
+
+bot/                    # Discord Bot (Go)
+├── cmd/pervigil-bot/   # エントリーポイント
+├── internal/
+│   ├── config/         # 設定読み込み
+│   ├── handler/        # コマンドハンドラ
+│   └── temp/           # 温度センサー
+├── go.mod
+└── go.sum
 ```
 
 **依存関係**: `nic-monitor.sh`, `log-monitor.sh` → `source discord-notify.sh`
@@ -55,6 +64,39 @@ scp -r scripts/ vyos@<IP>:/config/scripts/
 | 70-85℃ | 警告 | Discord通知 |
 | >85℃ | 危険 | 速度1Gbps制限 |
 | <65℃ | 復旧 | 速度制限解除 |
+
+## Discord Bot (pervigil-bot)
+
+### ビルド
+
+```bash
+cd bot
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o pervigil-bot ./cmd/pervigil-bot
+```
+
+### デプロイ
+
+```bash
+scp bot/pervigil-bot vyos@<IP>:/config/scripts/pervigil/
+```
+
+### 起動
+
+```bash
+# VyOS上
+cd /config/scripts/pervigil
+./pervigil-bot
+```
+
+### 環境変数 (bot用)
+
+| 変数 | 必須 | 用途 |
+|------|------|------|
+| BOT_TOKEN | ✅ | Discord Bot Token |
+| GUILD_ID | - | サーバーID (コマンド即時反映用) |
+| CLEANUP_COMMANDS | - | 終了時コマンド削除 (1で有効) |
+
+`.env` は実行ファイルと同じディレクトリに配置。
 
 ## 注意事項
 
