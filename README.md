@@ -12,6 +12,14 @@ scripts/
 ├── nic-monitor.sh      # NIC温度監視
 ├── log-monitor.sh      # ログ監視 (エラー/警告抽出)
 └── .env                # シークレット (要作成)
+
+bot/                    # Discord Bot (Go)
+├── cmd/pervigil-bot/   # エントリーポイント
+└── internal/
+    ├── config/         # 設定読み込み
+    ├── handler/        # コマンドハンドラ
+    ├── sysinfo/        # システム情報取得
+    └── temp/           # 温度センサー
 ```
 
 ## 機能
@@ -97,7 +105,51 @@ save
 | --status | 永続ログの状態表示 |
 | --tail | 永続ログをtail -f |
 
-## Discord Webhook設定
+## Discord Bot (pervigil-bot)
+
+Discordからオンデマンドでシステム情報を取得するBot。
+
+### コマンド一覧
+
+| コマンド | 説明 |
+| -------- | ---- |
+| /nic | NIC温度を表示 |
+| /temp | 全温度情報を表示 (CPU + NIC) |
+| /status | システム状態サマリー |
+| /cpu | CPU使用率とロードアベレージ |
+| /memory | メモリ使用状況 |
+| /network | 全NIC情報 (状態/速度/統計) |
+| /disk | ディスク使用状況 |
+| /info | ルーター全情報 |
+
+### ビルド
+
+```bash
+cd bot
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o pervigil-bot ./cmd/pervigil-bot
+```
+
+### デプロイ
+
+```bash
+scp bot/pervigil-bot vyos@192.168.x.x:/config/scripts/pervigil/
+```
+
+### 環境変数 (bot/.env)
+
+```bash
+BOT_TOKEN="your-discord-bot-token"
+GUILD_ID="your-guild-id"           # 省略可 (コマンド即時反映用)
+MONITOR_NICS="eth0,eth1,eth2"      # 省略可 (監視NIC一覧)
+```
+
+### 起動
+
+```bash
+[VyOS] cd /config/scripts/pervigil && ./pervigil-bot
+```
+
+## Discord Webhook設定 (scripts用)
 
 1. Discordサーバー設定 → 連携サービス → Webhook
 2. 「新しいウェブフック」を作成
