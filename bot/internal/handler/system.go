@@ -8,10 +8,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/murata-lab/pervigil/bot/internal/sysinfo"
-	"github.com/murata-lab/pervigil/bot/internal/temp"
+	"github.com/murata-lab/pervigil/bot/internal/temperature"
 )
 
-func maxCPUTemp(temps []temp.TempReading) float64 {
+func maxCPUTemp(temps []temperature.TempReading) float64 {
 	max := 0.0
 	for _, t := range temps {
 		if t.Value > max {
@@ -25,7 +25,7 @@ func cmdStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	hostname, _ := os.Hostname()
 	uptime := sysinfo.GetUptime()
 	iface := os.Getenv("NIC_INTERFACE")
-	cpu, nic := temp.GetAllTemps(iface)
+	cpu, nic := temperature.GetAllTemps(iface)
 
 	var sb strings.Builder
 	sb.WriteString("**システム状態**\n```\n")

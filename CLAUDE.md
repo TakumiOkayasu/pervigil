@@ -20,7 +20,8 @@ bot/                    # Discord Bot (Go)
 ├── internal/
 │   ├── config/         # 設定読み込み
 │   ├── handler/        # コマンドハンドラ
-│   └── temp/           # 温度センサー
+│   ├── sysinfo/        # システム情報取得
+│   └── temperature/    # 温度センサー
 ├── go.mod
 └── go.sum
 ```
@@ -98,8 +99,28 @@ cd /config/scripts/pervigil
 
 `.env` は実行ファイルと同じディレクトリに配置。
 
+## Go コード品質
+
+**必須**: コミット前に以下を実行
+
+```bash
+cd bot
+gofmt -w .              # フォーマット
+go vet ./...            # 静的解析
+staticcheck ./...       # 追加の静的解析
+```
+
+| ツール | 用途 | バージョン |
+|--------|------|-----------|
+| gofmt | フォーマット | Go標準 |
+| go vet | 静的解析 | Go標準 |
+| staticcheck | 追加lint | latest |
+
+**staticcheck インストール**: `go install honnef.co/go/tools/cmd/staticcheck@latest`
+
 ## 注意事項
 
 - シェルスクリプトは `set -euo pipefail` 必須
 - 温度取得は Intel X540-T2 (ixgbe) 想定
 - `/config/` 以下はVyOS再起動後も永続化
+- Go: latest LTS を使用

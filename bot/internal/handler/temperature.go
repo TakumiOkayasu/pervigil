@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/murata-lab/pervigil/bot/internal/temp"
+	"github.com/murata-lab/pervigil/bot/internal/temperature"
 )
 
 func cmdNIC(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -15,7 +15,7 @@ func cmdNIC(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		iface = "eth1"
 	}
 
-	nic, err := temp.GetNICTemp(iface)
+	nic, err := temperature.GetNICTemp(iface)
 
 	var content string
 	if err != nil {
@@ -30,7 +30,7 @@ func cmdNIC(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	iface := os.Getenv("NIC_INTERFACE")
-	cpu, nic := temp.GetAllTemps(iface)
+	cpu, nic := temperature.GetAllTemps(iface)
 
 	var sb strings.Builder
 	sb.WriteString("**温度情報**\n```\n")

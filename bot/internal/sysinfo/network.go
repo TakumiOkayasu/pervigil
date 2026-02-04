@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/murata-lab/pervigil/bot/internal/temp"
+	"github.com/murata-lab/pervigil/bot/internal/temperature"
 )
 
 // NICInfo contains network interface information.
@@ -66,7 +66,7 @@ func GetNICInfo(iface string) (*NICInfo, error) {
 	info.TxErrors = readStatFile(filepath.Join(statsPath, "tx_errors"))
 
 	// Temperature
-	if t, err := temp.GetNICTemp(iface); err == nil {
+	if t, err := temperature.GetNICTemp(iface); err == nil {
 		info.Temp = t.Value
 	}
 
