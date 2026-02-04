@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/murata-lab/pervigil/bot/internal/temp"
+	"github.com/murata-lab/pervigil/bot/internal/temperature"
 )
 
 // RouterInfo contains comprehensive router system information.
@@ -19,7 +19,7 @@ type RouterInfo struct {
 	Memory   *MemInfo
 	NICs     []NICInfo
 	Disk     *DiskInfo
-	CPUTemps []temp.TempReading
+	CPUTemps []temperature.TempReading
 }
 
 // GetAllRouterInfo returns all router system information.
@@ -58,7 +58,7 @@ func GetAllRouterInfo() *RouterInfo {
 	}
 
 	// CPU temps
-	info.CPUTemps, err = temp.GetCPUTemps()
+	info.CPUTemps, err = temperature.GetCPUTemps()
 	if err != nil {
 		log.Printf("[sysinfo] cpu temps: %v", err)
 	}

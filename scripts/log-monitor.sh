@@ -178,32 +178,49 @@ main() {
     echo "[INFO] Processed: $error_count errors, $warning_count warnings"
 }
 
-# 引数処理
-case "${1:-}" in
-    --test)
-        echo "Testing log patterns..."
-        echo "ERROR test" | matches_pattern "$(cat)" "${ERROR_PATTERNS[@]}" && echo "ERROR pattern works"
-        ;;
-    --status)
-        echo "Persistent log: $PERSISTENT_LOG"
-        if [[ -f "$PERSISTENT_LOG" ]]; then
-            local size
-            size=$(stat -f%z "$PERSISTENT_LOG" 2>/dev/null || stat -c%s "$PERSISTENT_LOG" 2>/dev/null || echo 0)
-            echo "Size: $size bytes"
-            echo "Last 5 entries:"
-            tail -5 "$PERSISTENT_LOG"
-        else
-            echo "No persistent log yet"
-        fi
-        ;;
-    --tail)
-        if [[ -f "$PERSISTENT_LOG" ]]; then
-            tail -f "$PERSISTENT_LOG"
-        else
-            echo "No persistent log yet"
-        fi
-        ;;
-    *)
-        main
-        ;;
-esac
+# テスト用エントリポイント（DI対応）
+run_test() {
+    echo "Testing log patterns..."
+    if matches_pattern "ERROR test" "${ERROR_PATTERNS[@]}"; then
+        echo "ERROR pattern works"
+    fi
+}
+
+run_status() {
+    echo "Persistent log: $PERSISTENT_LOG"
+    if [[ -f "$PERSISTENT_LOG" ]]; then
+        local size
+        size=$(stat -f%z "$PERSISTENT_LOG" 2>/dev/null || stat -c%s "$PERSISTENT_LOG" 2>/dev/null || echo 0)
+        echo "Size: $size bytes"
+        echo "Last 5 entries:"
+        tail -5 "$PERSISTENT_LOG"
+    else
+        echo "No persistent log yet"
+    fi
+}
+
+run_tail() {
+    if [[ -f "$PERSISTENT_LOG" ]]; then
+        tail -f "$PERSISTENT_LOG"
+    else
+        echo "No persistent log yet"
+    fi
+}
+
+# 直接実行時のみ引数処理
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    case "${1:-}" in
+        --test)
+            run_test
+            ;;
+        --status)
+            run_status
+            ;;
+        --tail)
+            run_tail
+            ;;
+        *)
+            main
+            ;;
+    esac
+fi

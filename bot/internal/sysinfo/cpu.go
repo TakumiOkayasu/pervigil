@@ -7,18 +7,50 @@ import (
 	"time"
 )
 
+// fileReadable abstracts file reading (defined at usage site per Go idiom)
+type fileReadable interface {
+	ReadFile(path string) ([]byte, error)
+}
+
+// sleeper abstracts time.Sleep for testing
+type sleeper interface {
+	Sleep(d time.Duration)
+}
+
+// cpuDeps combines interfaces for CPU info operations
+type cpuDeps interface {
+	fileReadable
+	sleeper
+}
+
+// osCpuDeps is the production implementation
+type osCpuDeps struct{}
+
+func (o *osCpuDeps) ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
+}
+
+func (o *osCpuDeps) Sleep(d time.Duration) {
+	time.Sleep(d)
+}
+
 // CPUInfo contains CPU usage and load information.
 type CPUInfo struct {
 	Usage   float64    // Overall CPU usage (%)
 	LoadAvg [3]float64 // 1/5/15 min load averages
 }
 
-// GetCPUInfo returns CPU usage and load averages.
+// GetCPUInfo returns CPU usage and load averages
 func GetCPUInfo() (*CPUInfo, error) {
+	return GetCPUInfoWith(&osCpuDeps{})
+}
+
+// GetCPUInfoWith returns CPU usage using the provided cpuDeps (for testing)
+func GetCPUInfoWith(d cpuDeps) (*CPUInfo, error) {
 	info := &CPUInfo{}
 
 	// Get load averages
-	data, err := os.ReadFile("/proc/loadavg")
+	data, err := d.ReadFile("/proc/loadavg")
 	if err == nil {
 		fields := strings.Fields(string(data))
 		if len(fields) >= 3 {
@@ -29,7 +61,7 @@ func GetCPUInfo() (*CPUInfo, error) {
 	}
 
 	// Get CPU usage (compare two /proc/stat snapshots)
-	usage, err := getCPUUsage()
+	usage, err := getCPUUsageWith(d)
 	if err == nil {
 		info.Usage = usage
 	}
@@ -37,15 +69,15 @@ func GetCPUInfo() (*CPUInfo, error) {
 	return info, nil
 }
 
-func getCPUUsage() (float64, error) {
-	stat1, err := readCPUStat()
+func getCPUUsageWith(d cpuDeps) (float64, error) {
+	stat1, err := readCPUStatWith(d)
 	if err != nil {
 		return 0, err
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	d.Sleep(100 * time.Millisecond)
 
-	stat2, err := readCPUStat()
+	stat2, err := readCPUStatWith(d)
 	if err != nil {
 		return 0, err
 	}
@@ -65,8 +97,8 @@ type cpuStat struct {
 	total uint64
 }
 
-func readCPUStat() (*cpuStat, error) {
-	data, err := os.ReadFile("/proc/stat")
+func readCPUStatWith(r fileReadable) (*cpuStat, error) {
+	data, err := r.ReadFile("/proc/stat")
 	if err != nil {
 		return nil, err
 	}

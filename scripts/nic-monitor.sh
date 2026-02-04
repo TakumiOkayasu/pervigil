@@ -142,20 +142,33 @@ main() {
     set_state "$new_state"
 }
 
-# 引数処理
-case "${1:-}" in
-    --test)
-        echo "Testing NIC temperature reading..."
-        temp=$(get_nic_temp)
-        echo "Temperature: ${temp}°C"
-        ;;
-    --status)
-        temp=$(get_nic_temp)
-        state=$(get_state)
-        echo "Temperature: ${temp}°C"
-        echo "State: $state"
-        ;;
-    *)
-        main
-        ;;
-esac
+# テスト用エントリポイント（DI対応）
+run_test() {
+    echo "Testing NIC temperature reading..."
+    local temp
+    temp=$(get_nic_temp)
+    echo "Temperature: ${temp}°C"
+}
+
+run_status() {
+    local temp state
+    temp=$(get_nic_temp)
+    state=$(get_state)
+    echo "Temperature: ${temp}°C"
+    echo "State: $state"
+}
+
+# 直接実行時のみ引数処理
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    case "${1:-}" in
+        --test)
+            run_test
+            ;;
+        --status)
+            run_status
+            ;;
+        *)
+            main
+            ;;
+    esac
+fi
