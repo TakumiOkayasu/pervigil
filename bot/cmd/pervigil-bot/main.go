@@ -34,11 +34,12 @@ func main() {
 		log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
 	})
 
+	handlers := handler.Handlers()
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if i.Type != discordgo.InteractionApplicationCommand {
 			return
 		}
-		if h, ok := handler.Handlers[i.ApplicationCommandData().Name]; ok {
+		if h, ok := handlers[i.ApplicationCommandData().Name]; ok {
 			h(s, i)
 		}
 	})
@@ -49,8 +50,9 @@ func main() {
 	defer dg.Close()
 
 	// Register commands
-	registeredCmds := make([]*discordgo.ApplicationCommand, len(handler.Commands))
-	for i, cmd := range handler.Commands {
+	cmds := handler.Commands()
+	registeredCmds := make([]*discordgo.ApplicationCommand, len(cmds))
+	for i, cmd := range cmds {
 		registered, err := dg.ApplicationCommandCreate(dg.State.User.ID, cfg.GuildID, cmd)
 		if err != nil {
 			log.Printf("command register error (%s): %v", cmd.Name, err)
