@@ -183,7 +183,7 @@ func getNICFromEthtoolStats(iface string, d commandRunnable) (*TempReading, erro
 	// ixgbe driver reports temperature in stats
 	re := regexp.MustCompile(`temp:\s*([\d.]+)`)
 	match := re.FindStringSubmatch(string(out))
-	if match == nil || len(match) < 2 {
+	if len(match) < 2 {
 		return nil, fmt.Errorf("temperature not found in ethtool stats")
 	}
 
