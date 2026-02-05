@@ -15,9 +15,13 @@ import (
 
 func main() {
 	// Load .env from current dir, then from executable dir
-	_ = godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env not loaded from current dir: %v", err)
+	}
 	if exe, err := os.Executable(); err == nil {
-		_ = godotenv.Load(filepath.Join(filepath.Dir(exe), ".env"))
+		if err := godotenv.Load(filepath.Join(filepath.Dir(exe), ".env")); err != nil {
+			log.Printf("Warning: .env not loaded from exe dir: %v", err)
+		}
 	}
 
 	cfg, err := config.Load()

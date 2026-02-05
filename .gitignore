@@ -9,6 +9,9 @@ scripts/.env
 # Local logs
 *.log
 
+# Claude Code local settings
+.claude/
+
 # Editor
 .vscode/
 .idea/

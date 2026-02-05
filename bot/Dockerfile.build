@@ -1,0 +1,29 @@
+# Build environment for pervigil
+# hadolint ignore=DL3007
+FROM golang:alpine AS builder
+
+# Target platform
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache git
+
+WORKDIR /src
+
+# Cache dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Build
+COPY . .
+
+ENV CGO_ENABLED=0
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/pervigil-monitor ./cmd/pervigil-monitor && \
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/pervigil-bot ./cmd/pervigil-bot
+
+# Output stage
+# hadolint ignore=DL3007
+FROM busybox:latest
+COPY --from=builder /out/ /
+CMD ["true"]
