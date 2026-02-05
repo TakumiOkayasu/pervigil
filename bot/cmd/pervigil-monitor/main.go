@@ -22,7 +22,9 @@ func main() {
 
 func run() error {
 	// Load .env file
-	_ = godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env file not loaded: %v", err)
+	}
 
 	cfg, err := loadConfig()
 	if err != nil {
