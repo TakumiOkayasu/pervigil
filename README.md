@@ -62,6 +62,24 @@ EOF
 cd /config/pervigil && ./pervigil-monitor
 ```
 
+### systemd化
+
+```bash
+# serviceファイル転送
+scp deploy/*.service vyos@<IP>:/tmp/
+
+# VyOS上で実行
+sudo mv /tmp/pervigil-*.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now pervigil-monitor
+sudo systemctl enable --now pervigil-bot
+```
+
+確認:
+```bash
+systemctl status pervigil-monitor pervigil-bot
+```
+
 ## 監視デーモン (pervigil-monitor)
 
 ### 機能
