@@ -3,6 +3,7 @@ package monitor
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/murata-lab/pervigil/bot/internal/notifier"
 	"github.com/murata-lab/pervigil/bot/internal/temperature"
@@ -63,7 +64,7 @@ type NICMonitor struct {
 	stateStore StateStore
 	speedCtrl  SpeedController
 	thresholds NICThresholds
-	iface      string
+	ifaces     []string
 	hostname   string
 }
 
@@ -98,11 +99,28 @@ func WithSpeedController(c SpeedController) NICOption {
 	}
 }
 
-// WithInterface sets the NIC interface
-func WithInterface(iface string) NICOption {
+// WithInterface sets the NIC interfaces (comma-separated)
+func WithInterface(ifaces string) NICOption {
 	return func(m *NICMonitor) {
-		m.iface = iface
+		m.ifaces = splitInterfaces(ifaces)
 	}
+}
+
+// splitInterfaces splits comma-separated interface names
+func splitInterfaces(s string) []string {
+	if s == "" {
+		return []string{"eth1"}
+	}
+	var result []string
+	for _, part := range strings.Split(s, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"eth1"}
+	}
+	return result
 }
 
 // WithThresholds sets custom thresholds
@@ -117,7 +135,7 @@ func NewNICMonitor(opts ...NICOption) *NICMonitor {
 	hostname, _ := os.Hostname()
 	m := &NICMonitor{
 		thresholds: DefaultThresholds(),
-		iface:      "eth1",
+		ifaces:     []string{"eth1"},
 		hostname:   hostname,
 	}
 	for _, opt := range opts {
@@ -128,9 +146,29 @@ func NewNICMonitor(opts ...NICOption) *NICMonitor {
 
 // Check performs a temperature check and takes appropriate action
 func (m *NICMonitor) Check() error {
-	reading, err := m.tempReader.GetNICTemp(m.iface)
-	if err != nil {
-		return fmt.Errorf("read temperature: %w", err)
+	// Find the hottest NIC
+	var maxTemp float64
+	var hottestIface string
+	var lastErr error
+
+	for _, iface := range m.ifaces {
+		reading, err := m.tempReader.GetNICTemp(iface)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if reading.Value > maxTemp {
+			maxTemp = reading.Value
+			hottestIface = iface
+		}
+	}
+
+	// If no NIC temperature was read, return error
+	if hottestIface == "" {
+		if lastErr != nil {
+			return fmt.Errorf("read temperature: %w", lastErr)
+		}
+		return fmt.Errorf("no NIC temperature available")
 	}
 
 	state, err := m.stateStore.Load()
@@ -138,8 +176,8 @@ func (m *NICMonitor) Check() error {
 		return fmt.Errorf("load state: %w", err)
 	}
 
-	newTempState := m.determineState(reading.Value)
-	newState, err := m.handleTransition(state, newTempState, reading.Value)
+	newTempState := m.determineState(maxTemp)
+	newState, err := m.handleTransition(state, newTempState, maxTemp, hottestIface)
 	if err != nil {
 		return err
 	}
@@ -157,20 +195,20 @@ func (m *NICMonitor) determineState(temp float64) NICState {
 	return StateNormal
 }
 
-func (m *NICMonitor) handleTransition(current MonitorState, newTempState NICState, temp float64) (MonitorState, error) {
+func (m *NICMonitor) handleTransition(current MonitorState, newTempState NICState, temp float64, iface string) (MonitorState, error) {
 	newState := MonitorState{TempState: newTempState, SpeedLimited: current.SpeedLimited}
 
 	switch {
 	case newTempState == StateCritical && current.TempState != StateCritical:
 		if err := m.notifier.Send(
 			fmt.Sprintf("🔥 NIC過熱警報 - %s", m.hostname),
-			"NIC温度が危険域に達しました。速度を1Gbpsに制限します。",
+			fmt.Sprintf("NIC(%s)温度が危険域に達しました。速度を1Gbpsに制限します。", iface),
 			notifier.ColorRed,
-			m.makeFields(temp, "Threshold", m.thresholds.Critical, "Action", "Speed limited to 1Gbps"),
+			m.makeFields(temp, "Interface", iface, "Threshold", m.thresholds.Critical, "Action", "Speed limited to 1Gbps"),
 		); err != nil {
 			return newState, fmt.Errorf("send notification: %w", err)
 		}
-		if err := m.speedCtrl.Limit(m.iface); err != nil {
+		if err := m.speedCtrl.Limit(iface); err != nil {
 			return newState, err
 		}
 		newState.SpeedLimited = true
@@ -178,9 +216,9 @@ func (m *NICMonitor) handleTransition(current MonitorState, newTempState NICStat
 	case newTempState == StateWarning && current.TempState == StateNormal:
 		if err := m.notifier.Send(
 			fmt.Sprintf("⚠️ NIC温度警告 - %s", m.hostname),
-			"NIC温度が警告域に達しました。監視を継続します。",
+			fmt.Sprintf("NIC(%s)温度が警告域に達しました。監視を継続します。", iface),
 			notifier.ColorYellow,
-			m.makeFields(temp, "Warning Threshold", m.thresholds.Warning, "Critical Threshold", m.thresholds.Critical),
+			m.makeFields(temp, "Interface", iface, "Warning Threshold", m.thresholds.Warning, "Critical Threshold", m.thresholds.Critical),
 		); err != nil {
 			return newState, err
 		}
@@ -189,13 +227,13 @@ func (m *NICMonitor) handleTransition(current MonitorState, newTempState NICStat
 		// Restore speed when below recovery threshold
 		if err := m.notifier.Send(
 			fmt.Sprintf("✅ NIC温度正常化 - %s", m.hostname),
-			"NIC温度が正常範囲に戻りました。速度制限を解除します。",
+			fmt.Sprintf("NIC(%s)温度が正常範囲に戻りました。速度制限を解除します。", iface),
 			notifier.ColorGreen,
-			m.makeFields(temp, "Action", "Speed restored to auto"),
+			m.makeFields(temp, "Interface", iface, "Action", "Speed restored to auto"),
 		); err != nil {
 			return newState, fmt.Errorf("send notification: %w", err)
 		}
-		if err := m.speedCtrl.Restore(m.iface); err != nil {
+		if err := m.speedCtrl.Restore(iface); err != nil {
 			return newState, err
 		}
 		newState.SpeedLimited = false
@@ -203,9 +241,9 @@ func (m *NICMonitor) handleTransition(current MonitorState, newTempState NICStat
 	case newTempState == StateNormal && current.TempState == StateWarning:
 		if err := m.notifier.Send(
 			fmt.Sprintf("✅ NIC温度正常化 - %s", m.hostname),
-			"NIC温度が正常範囲に戻りました。",
+			fmt.Sprintf("NIC(%s)温度が正常範囲に戻りました。", iface),
 			notifier.ColorGreen,
-			m.makeFields(temp),
+			m.makeFields(temp, "Interface", iface),
 		); err != nil {
 			return newState, err
 		}
