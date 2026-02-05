@@ -9,10 +9,14 @@ import (
 )
 
 func cmdNetwork(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	nics := sysinfo.GetAllNICs()
 
 	if len(nics) == 0 {
-		respond(s, i, "NIC情報なし")
+		followup(s, i, "NIC情報なし")
 		return
 	}
 
@@ -41,5 +45,5 @@ func cmdNetwork(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	sb.WriteString("```")
-	respond(s, i, sb.String())
+	followup(s, i, sb.String())
 }

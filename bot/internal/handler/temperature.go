@@ -10,6 +10,10 @@ import (
 )
 
 func cmdNIC(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	iface := os.Getenv("NIC_INTERFACE")
 	if iface == "" {
 		iface = "eth1"
@@ -25,10 +29,14 @@ func cmdNIC(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		content = fmt.Sprintf("**NIC温度** (%s)\n%s %.1f°C", nic.Label, status, nic.Value)
 	}
 
-	respond(s, i, content)
+	followup(s, i, content)
 }
 
 func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	iface := os.Getenv("NIC_INTERFACE")
 	cpu, nic := temperature.GetAllTemps(iface)
 
@@ -53,5 +61,5 @@ func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	sb.WriteString("```")
-	respond(s, i, sb.String())
+	followup(s, i, sb.String())
 }

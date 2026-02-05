@@ -65,6 +65,23 @@ func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content strin
 	}
 }
 
+// deferredRespond sends a deferred response (for long-running commands).
+func deferredRespond(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+}
+
+// followup sends a followup message after deferred response.
+func followup(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
+	_, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		Content: content,
+	})
+	if err != nil {
+		log.Printf("[handler] followup error: %v", err)
+	}
+}
+
 // statusIndicator returns an emoji based on value thresholds.
 func statusIndicator(val, warn, crit float64) string {
 	switch {

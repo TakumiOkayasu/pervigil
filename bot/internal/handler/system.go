@@ -22,6 +22,10 @@ func maxCPUTemp(temps []temperature.TempReading) float64 {
 }
 
 func cmdStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	hostname, _ := os.Hostname()
 	uptime := sysinfo.GetUptime()
 	iface := os.Getenv("NIC_INTERFACE")
@@ -44,13 +48,17 @@ func cmdStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	sb.WriteString("```")
-	respond(s, i, sb.String())
+	followup(s, i, sb.String())
 }
 
 func cmdCPU(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	info, err := sysinfo.GetCPUInfo()
 	if err != nil {
-		respond(s, i, fmt.Sprintf("CPU情報取得エラー: %v", err))
+		followup(s, i, fmt.Sprintf("CPU情報取得エラー: %v", err))
 		return
 	}
 
@@ -61,13 +69,17 @@ func cmdCPU(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		info.LoadAvg[0], info.LoadAvg[1], info.LoadAvg[2]))
 	sb.WriteString("```")
 
-	respond(s, i, sb.String())
+	followup(s, i, sb.String())
 }
 
 func cmdMemory(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	info, err := sysinfo.GetMemoryInfo()
 	if err != nil {
-		respond(s, i, fmt.Sprintf("メモリ情報取得エラー: %v", err))
+		followup(s, i, fmt.Sprintf("メモリ情報取得エラー: %v", err))
 		return
 	}
 
@@ -81,13 +93,17 @@ func cmdMemory(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	sb.WriteString(fmt.Sprintf("使用率: %.1f%% %s\n", info.UsagePercent, status))
 	sb.WriteString("```")
 
-	respond(s, i, sb.String())
+	followup(s, i, sb.String())
 }
 
 func cmdDisk(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	info, err := sysinfo.GetDiskInfo("/")
 	if err != nil {
-		respond(s, i, fmt.Sprintf("ディスク情報取得エラー: %v", err))
+		followup(s, i, fmt.Sprintf("ディスク情報取得エラー: %v", err))
 		return
 	}
 
@@ -101,10 +117,14 @@ func cmdDisk(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	sb.WriteString(fmt.Sprintf("使用率: %.1f%% %s\n", info.UsagePercent, status))
 	sb.WriteString("```")
 
-	respond(s, i, sb.String())
+	followup(s, i, sb.String())
 }
 
 func cmdInfo(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if err := deferredRespond(s, i); err != nil {
+		return
+	}
+
 	info := sysinfo.GetAllRouterInfo()
 
 	var sb strings.Builder
@@ -155,5 +175,5 @@ func cmdInfo(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	sb.WriteString("```")
-	respond(s, i, sb.String())
+	followup(s, i, sb.String())
 }
