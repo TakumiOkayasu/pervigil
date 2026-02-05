@@ -1,5 +1,5 @@
 [Unit]
-Description=Pervigil Discord Bot
+Description=Pervigil NIC/Log Monitor
 After=network-online.target
 Wants=network-online.target
 
@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/config/pervigil
-ExecStart=/config/pervigil/pervigil-bot
+ExecStart=/config/pervigil/pervigil-monitor
 Restart=always
 RestartSec=10
 
