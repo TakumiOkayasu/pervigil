@@ -14,22 +14,23 @@ func cmdNIC(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	iface := os.Getenv("NIC_INTERFACE")
-	if iface == "" {
-		iface = "eth1"
-	}
+	ifaces := os.Getenv("NIC_INTERFACE")
+	_, nics := temperature.GetAllTemps(ifaces)
 
-	nic, err := temperature.GetNICTemp(iface)
+	var sb strings.Builder
+	sb.WriteString("**NIC温度**\n```\n")
 
-	var content string
-	if err != nil {
-		content = fmt.Sprintf("NIC温度取得エラー: %v", err)
+	if len(nics) == 0 {
+		sb.WriteString("取得不可\n")
 	} else {
-		status := statusIndicator(nic.Value, 70, 85)
-		content = fmt.Sprintf("**NIC温度** (%s)\n%s %.1f°C", nic.Label, status, nic.Value)
+		for _, nic := range nics {
+			status := statusIndicator(nic.Value, 70, 85)
+			sb.WriteString(fmt.Sprintf("%-10s: %5.1f°C %s\n", nic.Label, nic.Value, status))
+		}
 	}
 
-	followup(s, i, content)
+	sb.WriteString("```")
+	followup(s, i, sb.String())
 }
 
 func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -37,8 +38,8 @@ func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	iface := os.Getenv("NIC_INTERFACE")
-	cpu, nic := temperature.GetAllTemps(iface)
+	ifaces := os.Getenv("NIC_INTERFACE")
+	cpu, nics := temperature.GetAllTemps(ifaces)
 
 	var sb strings.Builder
 	sb.WriteString("**温度情報**\n```\n")
@@ -53,9 +54,11 @@ func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	sb.WriteString("\nNIC:\n")
-	if nic != nil {
-		status := statusIndicator(nic.Value, 70, 85)
-		sb.WriteString(fmt.Sprintf("  %-10s: %5.1f°C %s\n", nic.Label, nic.Value, status))
+	if len(nics) > 0 {
+		for _, nic := range nics {
+			status := statusIndicator(nic.Value, 70, 85)
+			sb.WriteString(fmt.Sprintf("  %-10s: %5.1f°C %s\n", nic.Label, nic.Value, status))
+		}
 	} else {
 		sb.WriteString("  取得不可\n")
 	}

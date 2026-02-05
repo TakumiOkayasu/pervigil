@@ -28,8 +28,8 @@ func cmdStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	hostname, _ := os.Hostname()
 	uptime := sysinfo.GetUptime()
-	iface := os.Getenv("NIC_INTERFACE")
-	cpu, nic := temperature.GetAllTemps(iface)
+	ifaces := os.Getenv("NIC_INTERFACE")
+	cpu, nics := temperature.GetAllTemps(ifaces)
 
 	var sb strings.Builder
 	sb.WriteString("**システム状態**\n```\n")
@@ -42,9 +42,9 @@ func cmdStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		sb.WriteString(fmt.Sprintf("CPU最高温度: %.1f°C\n", maxCPUTemp(cpu)))
 	}
 
-	if nic != nil {
+	for _, nic := range nics {
 		status := statusIndicator(nic.Value, 70, 85)
-		sb.WriteString(fmt.Sprintf("NIC温度: %.1f°C %s\n", nic.Value, status))
+		sb.WriteString(fmt.Sprintf("NIC温度(%s): %.1f°C %s\n", nic.Label, nic.Value, status))
 	}
 
 	sb.WriteString("```")

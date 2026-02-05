@@ -210,9 +210,30 @@ func getNICFromHwmon(iface string, d hwmonDeps) (*TempReading, error) {
 	return &TempReading{Label: iface, Value: val / 1000}, nil
 }
 
-// GetAllTemps returns all available temperature readings
-func GetAllTemps(nicIface string) (cpu []TempReading, nic *TempReading) {
+// GetAllTemps returns all available temperature readings (supports comma-separated NICs)
+func GetAllTemps(nicIfaces string) (cpu []TempReading, nics []TempReading) {
 	cpu, _ = GetCPUTemps()
-	nic, _ = GetNICTemp(nicIface)
+	for _, iface := range splitInterfaces(nicIfaces) {
+		if t, err := GetNICTemp(iface); err == nil {
+			nics = append(nics, *t)
+		}
+	}
 	return
+}
+
+// splitInterfaces splits comma-separated interface names
+func splitInterfaces(s string) []string {
+	if s == "" {
+		return []string{"eth1"}
+	}
+	var result []string
+	for _, part := range strings.Split(s, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"eth1"}
+	}
+	return result
 }
