@@ -1,0 +1,22 @@
+services:
+  # Phase 1: Build
+  build:
+    build: .
+    platform: linux/amd64
+    volumes:
+      - ./output:/output
+      - ./build-ixgbe-hwmon.sh:/build/build.sh:ro
+    command: ["bash", "/build/build.sh"]
+
+  # Phase 2: Test (interactive)
+  test:
+    build: .
+    platform: linux/amd64
+    privileged: true
+    volumes:
+      - ./output:/output:ro
+      - ./test-ixgbe-hwmon.sh:/test.sh:ro
+    command: ["bash", "/test.sh"]
+    depends_on:
+      build:
+        condition: service_completed_successfully
