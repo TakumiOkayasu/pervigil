@@ -28,6 +28,8 @@ func init() {
 		{"info", "ルーター全情報を表示", cmdInfo},
 		// network.go
 		{"network", "全NIC情報を表示", cmdNetwork},
+		// anthropic.go
+		{"claude", "Claude API利用状況を表示", cmdClaude},
 	}
 }
 

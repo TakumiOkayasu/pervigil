@@ -14,12 +14,13 @@ bot/
 │   ├── pervigil-bot/       # Discord Bot
 │   └── pervigil-monitor/   # 監視デーモン
 └── internal/
+    ├── anthropic/          # Anthropic Admin APIクライアント
     ├── config/             # 設定読み込み
     ├── handler/            # Botコマンドハンドラ
     ├── sysinfo/            # システム情報取得
     ├── temperature/        # 温度センサー
     ├── notifier/           # Discord Webhook通知
-    └── monitor/            # NIC/ログ監視ロジック
+    └── monitor/            # NIC/ログ/コスト監視ロジック
 ```
 
 ## 開発コマンド
@@ -58,13 +59,21 @@ scp bot/pervigil-bot vyos@<IP>:/config/scripts/pervigil/
 | CHECK_INTERVAL | - | 60 | チェック間隔(秒) |
 | STATE_FILE | - | /tmp/pervigil-state | 状態ファイル |
 | LOG_FILE | - | /var/log/syslog | 監視ログ |
+| ANTHROPIC_ADMIN_KEY | - | - | Anthropic Admin APIキー |
+| COST_CHECK_INTERVAL | - | 3600 | コストチェック間隔(秒) |
+| DAILY_BUDGET_WARN | - | 5.0 | 日次警告閾値($) |
+| DAILY_BUDGET_CRIT | - | 10.0 | 日次危険閾値($) |
+| COST_STATE_FILE | - | /tmp/pervigil-cost-state | コスト状態ファイル |
 
 ## 環境変数 (pervigil-bot)
 
-| 変数 | 必須 | 用途 |
-|------|------|------|
-| BOT_TOKEN | ✅ | Discord Bot Token |
-| GUILD_ID | - | サーバーID (コマンド即時反映用) |
+| 変数 | 必須 | デフォルト | 用途 |
+|------|------|-----------|------|
+| BOT_TOKEN | ✅ | - | Discord Bot Token |
+| GUILD_ID | - | - | サーバーID (コマンド即時反映用) |
+| ANTHROPIC_ADMIN_KEY | - | - | Anthropic Admin APIキー |
+| DAILY_BUDGET_WARN | - | 5.0 | 日次警告閾値($) |
+| DAILY_BUDGET_CRIT | - | 10.0 | 日次危険閾値($) |
 
 `.env` は実行ファイルと同じディレクトリに配置。
 
@@ -100,4 +109,4 @@ staticcheck ./...       # 追加の静的解析
 
 - 温度取得は Intel X540-T2 (ixgbe) 想定
 - `/config/` 以下はVyOS再起動後も永続化
-- Go: latest LTS を使用
+- Go 1.26 を使用
