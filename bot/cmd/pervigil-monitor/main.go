@@ -84,15 +84,19 @@ func run() error {
 		costCh = costTicker.C
 	}
 
+	suppress := monitor.NewErrorSuppressor(
+		monitor.WithSuppressInterval(time.Duration(cfg.suppressInterval) * time.Second),
+	)
+
 	// Run immediately on startup
-	runChecks(nicMonitor, logMonitor, costMonitor)
+	runChecks(nicMonitor, logMonitor, costMonitor, suppress)
 
 	for {
 		select {
 		case <-ticker.C:
-			runChecks(nicMonitor, logMonitor, nil)
+			runChecks(nicMonitor, logMonitor, nil, suppress)
 		case <-costCh:
-			runChecks(nil, nil, costMonitor)
+			runChecks(nil, nil, costMonitor, suppress)
 		case sig := <-stop:
 			log.Printf("Received %v, shutting down", sig)
 			return nil
@@ -100,19 +104,28 @@ func run() error {
 	}
 }
 
-func runChecks(nic *monitor.NICMonitor, lg *monitor.LogMonitor, cost *monitor.CostMonitor) {
+func runChecks(nic *monitor.NICMonitor, lg *monitor.LogMonitor, cost *monitor.CostMonitor, suppress *monitor.ErrorSuppressor) {
 	if nic != nil {
 		if err := nic.Check(); err != nil {
-			log.Printf("NIC monitor error: %v", err)
+			if msg, ok := suppress.Check("nic", err); ok {
+				log.Printf("NIC monitor error: %s", msg)
+			}
+		} else {
+			suppress.Check("nic", nil)
 		}
 	}
 
 	if lg != nil {
 		result, err := lg.Process()
 		if err != nil {
-			log.Printf("Log monitor error: %v", err)
-		} else if result != nil && (result.ErrorCount > 0 || result.WarningCount > 0) {
-			log.Printf("Log monitor: %d errors, %d warnings", result.ErrorCount, result.WarningCount)
+			if msg, ok := suppress.Check("log", err); ok {
+				log.Printf("Log monitor error: %s", msg)
+			}
+		} else {
+			suppress.Check("log", nil)
+			if result != nil && (result.ErrorCount > 0 || result.WarningCount > 0) {
+				log.Printf("Log monitor: %d errors, %d warnings", result.ErrorCount, result.WarningCount)
+			}
 		}
 	}
 
@@ -121,7 +134,11 @@ func runChecks(nic *monitor.NICMonitor, lg *monitor.LogMonitor, cost *monitor.Co
 		err := cost.Check(ctx)
 		cancel()
 		if err != nil {
-			log.Printf("Cost monitor error: %v", err)
+			if msg, ok := suppress.Check("cost", err); ok {
+				log.Printf("Cost monitor error: %s", msg)
+			}
+		} else {
+			suppress.Check("cost", nil)
 		}
 	}
 }
@@ -138,6 +155,7 @@ type config struct {
 	dailyBudgetWarn   float64
 	dailyBudgetCrit   float64
 	costStateFile     string
+	suppressInterval  int
 }
 
 func loadConfig() (*config, error) {
@@ -201,6 +219,13 @@ func loadConfig() (*config, error) {
 		costStateFile = "/tmp/pervigil-cost-state"
 	}
 
+	suppressInterval := 3600
+	if v := os.Getenv("ERROR_SUPPRESS_INTERVAL"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			suppressInterval = i
+		}
+	}
+
 	return &config{
 		webhookURL:        webhookURL,
 		nicInterface:      nicInterface,
@@ -213,5 +238,6 @@ func loadConfig() (*config, error) {
 		dailyBudgetWarn:   dailyBudgetWarn,
 		dailyBudgetCrit:   dailyBudgetCrit,
 		costStateFile:     costStateFile,
+		suppressInterval:  suppressInterval,
 	}, nil
 }
