@@ -36,7 +36,7 @@ docker rm tmp-pervigil
 ### ビルドオプション
 
 | 変数 | デフォルト | 説明 |
-|------|-----------|------|
+| ------ | ----------- | ------ |
 | TARGETOS | linux | ターゲットOS |
 | TARGETARCH | amd64 | ターゲットアーキテクチャ |
 
@@ -76,6 +76,7 @@ sudo systemctl enable --now pervigil-bot
 ```
 
 確認:
+
 ```bash
 systemctl status pervigil-monitor pervigil-bot
 ```
@@ -85,7 +86,7 @@ systemctl status pervigil-monitor pervigil-bot
 ### 機能
 
 | 機能 | 説明 |
-|------|------|
+| ------ | ------ |
 | NIC温度監視 | FSMベースの状態管理、速度制限制御 |
 | ログ監視 | パターンマッチ、除外ルール対応 |
 | Discord通知 | Webhook経由でリアルタイム通知 |
@@ -93,16 +94,16 @@ systemctl status pervigil-monitor pervigil-bot
 ### NIC温度閾値
 
 | 温度 | 状態 | アクション |
-|------|------|------------|
+| ------ | ------ | ------------ |
 | <70℃ | 正常 | - |
 | 70-85℃ | 警告 | Discord通知 |
 | >85℃ | 危険 | Discord通知 + 速度1Gbps制限 |
 | <65℃ (復旧) | 正常 | 速度制限解除 |
 
-### 環境変数
+### 環境変数（monitor）
 
 | 変数 | 必須 | デフォルト | 説明 |
-|------|------|-----------|------|
+| ------ | ------ | ----------- | ------ |
 | DISCORD_WEBHOOK_URL | Yes | - | Webhook URL |
 | NIC_INTERFACE | No | eth1 | 監視NIC |
 | CHECK_INTERVAL | No | 60 | チェック間隔(秒) |
@@ -114,7 +115,7 @@ systemctl status pervigil-monitor pervigil-bot
 ### コマンド一覧
 
 | コマンド | 説明 |
-|----------|------|
+| ---------- | ------ |
 | /nic | NIC温度を表示 |
 | /temp | 全温度情報を表示 (CPU + NIC) |
 | /status | システム状態サマリー |
@@ -124,10 +125,10 @@ systemctl status pervigil-monitor pervigil-bot
 | /disk | ディスク使用状況 |
 | /info | ルーター全情報 |
 
-### 環境変数
+### 環境変数 (Bot)
 
 | 変数 | 必須 | 説明 |
-|------|------|------|
+| ------ | ------ | ------ |
 | BOT_TOKEN | Yes | Discord Bot Token |
 | GUILD_ID | No | サーバーID (コマンド即時反映用) |
 
