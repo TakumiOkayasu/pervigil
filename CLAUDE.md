@@ -53,7 +53,7 @@ scp bot/pervigil-bot vyos@<IP>:/config/scripts/pervigil/
 ## 環境変数 (pervigil-monitor)
 
 | 変数 | 必須 | デフォルト | 用途 |
-|------|------|-----------|------|
+| ------ | ------ | ----------- | ------ |
 | DISCORD_WEBHOOK_URL | ✅ | - | Webhook URL |
 | NIC_INTERFACE | - | eth1 | 監視NIC |
 | CHECK_INTERVAL | - | 60 | チェック間隔(秒) |
@@ -64,11 +64,12 @@ scp bot/pervigil-bot vyos@<IP>:/config/scripts/pervigil/
 | DAILY_BUDGET_WARN | - | 5.0 | 日次警告閾値($) |
 | DAILY_BUDGET_CRIT | - | 10.0 | 日次危険閾値($) |
 | COST_STATE_FILE | - | /tmp/pervigil-cost-state | コスト状態ファイル |
+| ERROR_SUPPRESS_INTERVAL | - | 3600 | エラー抑制間隔(秒) |
 
 ## 環境変数 (pervigil-bot)
 
 | 変数 | 必須 | デフォルト | 用途 |
-|------|------|-----------|------|
+| ------ | ------ | ----------- | ------ |
 | BOT_TOKEN | ✅ | - | Discord Bot Token |
 | GUILD_ID | - | - | サーバーID (コマンド即時反映用) |
 | ANTHROPIC_ADMIN_KEY | - | - | Anthropic Admin APIキー |
@@ -80,7 +81,7 @@ scp bot/pervigil-bot vyos@<IP>:/config/scripts/pervigil/
 ## NIC温度閾値
 
 | 温度 | 状態 | アクション |
-|------|------|------------|
+| ------ | ------ | ------------ |
 | <70℃ | 正常 | - |
 | 70-85℃ | 警告 | Discord通知 |
 | >85℃ | 危険 | 速度1Gbps制限 |
@@ -98,7 +99,7 @@ staticcheck ./...       # 追加の静的解析
 ```
 
 | ツール | 用途 | バージョン |
-|--------|------|-----------|
+| -------- | ------ | ----------- |
 | gofmt | フォーマット | Go標準 |
 | go vet | 静的解析 | Go標準 |
 | staticcheck | 追加lint | latest |
