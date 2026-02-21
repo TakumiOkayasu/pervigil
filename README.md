@@ -2,8 +2,6 @@
 
 VyOSルーター向け監視ツール。Discord Webhookで通知。
 
-> *Pervigil* (ラテン語): 常に見守る者
-
 ## 構成
 
 ```text
