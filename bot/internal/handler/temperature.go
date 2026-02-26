@@ -15,13 +15,19 @@ func cmdNIC(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	ifaces := os.Getenv("NIC_INTERFACE")
-	_, nics := temperature.GetAllTemps(ifaces)
+	_, nics, board := temperature.GetAllTemps(ifaces)
 
 	var sb strings.Builder
 	sb.WriteString("**NIC温度**\n```\n")
 
 	if len(nics) == 0 {
-		sb.WriteString("取得不可\n")
+		sb.WriteString("N/A (センサー未対応)\n")
+		if len(board) > 0 {
+			sb.WriteString("\nBoard:\n")
+			for _, b := range board {
+				sb.WriteString(fmt.Sprintf("  %-16s: %5.1f°C\n", b.Label, b.Value))
+			}
+		}
 	} else {
 		for _, nic := range nics {
 			status := statusIndicator(nic.Value, 70, 85)
@@ -39,7 +45,7 @@ func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	ifaces := os.Getenv("NIC_INTERFACE")
-	cpu, nics := temperature.GetAllTemps(ifaces)
+	cpu, nics, board := temperature.GetAllTemps(ifaces)
 
 	var sb strings.Builder
 	sb.WriteString("**温度情報**\n```\n")
@@ -60,7 +66,14 @@ func cmdTemp(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			sb.WriteString(fmt.Sprintf("  %-10s: %5.1f°C %s\n", nic.Label, nic.Value, status))
 		}
 	} else {
-		sb.WriteString("  取得不可\n")
+		sb.WriteString("  N/A (センサー未対応)\n")
+	}
+
+	if len(board) > 0 {
+		sb.WriteString("\nBoard:\n")
+		for _, b := range board {
+			sb.WriteString(fmt.Sprintf("  %-16s: %5.1f°C\n", b.Label, b.Value))
+		}
 	}
 
 	sb.WriteString("```")

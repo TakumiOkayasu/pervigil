@@ -20,6 +20,22 @@ func (m *mockTempReader) GetNICTemp(iface string) (*temperature.TempReading, err
 	return &temperature.TempReading{Label: iface, Value: m.temp}, nil
 }
 
+// mockPerIfaceTempReader returns different results per interface name.
+type mockPerIfaceTempReader struct {
+	temps map[string]float64
+	errs  map[string]error
+}
+
+func (m *mockPerIfaceTempReader) GetNICTemp(iface string) (*temperature.TempReading, error) {
+	if err, ok := m.errs[iface]; ok && err != nil {
+		return nil, err
+	}
+	if val, ok := m.temps[iface]; ok {
+		return &temperature.TempReading{Label: iface, Value: val}, nil
+	}
+	return nil, errors.New("unknown interface")
+}
+
 type mockNotifier struct {
 	calls []notifyCall
 }
@@ -305,5 +321,87 @@ func TestNICMonitor_Check_TempReadError(t *testing.T) {
 	err := m.Check()
 	if err == nil {
 		t.Error("expected error for sensor failure")
+	}
+}
+
+func TestNICMonitor_Check_SensorUnavailable(t *testing.T) {
+	temp := &mockTempReader{err: temperature.ErrSensorUnavailable}
+	notif := &mockNotifier{}
+	store := &mockStateStore{}
+	speed := &mockSpeedController{}
+
+	m := NewNICMonitor(
+		WithTempReader(temp),
+		WithNotifier(notif),
+		WithStateStore(store),
+		WithSpeedController(speed),
+	)
+
+	err := m.Check()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, temperature.ErrSensorUnavailable) {
+		t.Errorf("expected ErrSensorUnavailable, got %v", err)
+	}
+}
+
+func TestNICMonitor_Check_MixedErrors_RealErrorPriority(t *testing.T) {
+	// eth1: sensor unavailable, eth2: real error → real error should be returned
+	realErr := errors.New("hardware fault")
+	temp := &mockPerIfaceTempReader{
+		errs: map[string]error{
+			"eth1": temperature.ErrSensorUnavailable,
+			"eth2": realErr,
+		},
+	}
+	notif := &mockNotifier{}
+	store := &mockStateStore{}
+	speed := &mockSpeedController{}
+
+	m := NewNICMonitor(
+		WithTempReader(temp),
+		WithNotifier(notif),
+		WithStateStore(store),
+		WithSpeedController(speed),
+		WithInterface("eth1,eth2"),
+	)
+
+	err := m.Check()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if errors.Is(err, temperature.ErrSensorUnavailable) {
+		t.Error("real error should take priority over ErrSensorUnavailable")
+	}
+	if !errors.Is(err, realErr) {
+		t.Errorf("expected real error to be wrapped, got %v", err)
+	}
+}
+
+func TestNICMonitor_Check_MixedErrors_OneSuccess(t *testing.T) {
+	// eth1: sensor unavailable, eth2: success → should proceed normally
+	temp := &mockPerIfaceTempReader{
+		temps: map[string]float64{"eth2": 50.0},
+		errs:  map[string]error{"eth1": temperature.ErrSensorUnavailable},
+	}
+	notif := &mockNotifier{}
+	store := &mockStateStore{state: MonitorState{TempState: StateNormal}}
+	speed := &mockSpeedController{}
+
+	m := NewNICMonitor(
+		WithTempReader(temp),
+		WithNotifier(notif),
+		WithStateStore(store),
+		WithSpeedController(speed),
+		WithInterface("eth1,eth2"),
+	)
+
+	err := m.Check()
+	if err != nil {
+		t.Fatalf("expected no error (one NIC succeeded), got %v", err)
+	}
+	if store.state.TempState != StateNormal {
+		t.Errorf("state = %v, want Normal", store.state.TempState)
 	}
 }

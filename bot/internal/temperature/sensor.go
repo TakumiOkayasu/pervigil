@@ -1,6 +1,7 @@
 package temperature
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 )
+
+// ErrSensorUnavailable indicates the hardware lacks a temperature sensor.
+var ErrSensorUnavailable = errors.New("temperature sensor unavailable")
 
 // Single-responsibility interfaces (ISP)
 
@@ -114,12 +118,17 @@ type hwmonDeps interface {
 	globbable
 }
 
-func getCPUFromHwmon(d hwmonDeps) ([]TempReading, error) {
-	var temps []TempReading
+// isCPUHwmon returns true if the hwmon name is a CPU thermal driver.
+func isCPUHwmon(name string) bool {
+	return name == "coretemp" || name == "k10temp"
+}
 
+// scanHwmonTemps scans /sys/class/hwmon and splits results into CPU and board temps.
+// This avoids duplicate glob I/O when both are needed.
+func scanHwmonTemps(d hwmonDeps) (cpu, board []TempReading, err error) {
 	hwmonDirs, err := d.Glob("/sys/class/hwmon/hwmon*/temp*_input")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, path := range hwmonDirs {
@@ -127,27 +136,35 @@ func getCPUFromHwmon(d hwmonDeps) ([]TempReading, error) {
 		name, _ := d.ReadFile(filepath.Join(dir, "name"))
 		nameStr := strings.TrimSpace(string(name))
 
-		if nameStr != "coretemp" && nameStr != "k10temp" {
+		if nameStr == "" {
 			continue
-		}
-
-		labelPath := strings.Replace(path, "_input", "_label", 1)
-		label, _ := d.ReadFile(labelPath)
-		labelStr := strings.TrimSpace(string(label))
-		if labelStr == "" {
-			labelStr = nameStr
 		}
 
 		data, err := d.ReadFile(path)
 		if err != nil {
 			continue
 		}
-
 		val, _ := strconv.ParseFloat(strings.TrimSpace(string(data)), 64)
-		temps = append(temps, TempReading{Label: labelStr, Value: val / 1000})
+
+		if isCPUHwmon(nameStr) {
+			labelPath := strings.Replace(path, "_input", "_label", 1)
+			label, _ := d.ReadFile(labelPath)
+			labelStr := strings.TrimSpace(string(label))
+			if labelStr == "" {
+				labelStr = nameStr
+			}
+			cpu = append(cpu, TempReading{Label: labelStr, Value: val / 1000})
+		} else {
+			board = append(board, TempReading{Label: nameStr, Value: val / 1000})
+		}
 	}
 
-	return temps, nil
+	return cpu, board, nil
+}
+
+func getCPUFromHwmon(d hwmonDeps) ([]TempReading, error) {
+	cpu, _, err := scanHwmonTemps(d)
+	return cpu, err
 }
 
 // ethtoolDeps is the minimal interface for ethtool operations
@@ -198,7 +215,7 @@ func getNICFromHwmon(iface string, d hwmonDeps) (*TempReading, error) {
 		return nil, err
 	}
 	if len(hwmonDirs) == 0 {
-		return nil, fmt.Errorf("no hwmon for %s", iface)
+		return nil, fmt.Errorf("no hwmon for %s: %w", iface, ErrSensorUnavailable)
 	}
 
 	data, err := d.ReadFile(hwmonDirs[0])
@@ -210,11 +227,38 @@ func getNICFromHwmon(iface string, d hwmonDeps) (*TempReading, error) {
 	return &TempReading{Label: iface, Value: val / 1000}, nil
 }
 
+// GetBoardTemps returns non-CPU hwmon temperatures (e.g. PCH chipset).
+func GetBoardTemps() ([]TempReading, error) {
+	return GetBoardTempsWith(&osDeps{})
+}
+
+// GetBoardTempsWith returns non-CPU hwmon temperatures using provided deps.
+func GetBoardTempsWith(d hwmonDeps) ([]TempReading, error) {
+	_, board, err := scanHwmonTemps(d)
+	return board, err
+}
+
 // GetAllTemps returns all available temperature readings (supports comma-separated NICs)
-func GetAllTemps(nicIfaces string) (cpu []TempReading, nics []TempReading) {
-	cpu, _ = GetCPUTemps()
+func GetAllTemps(nicIfaces string) (cpu, nics, board []TempReading) {
+	return GetAllTempsWith(nicIfaces, &osDeps{})
+}
+
+// GetAllTempsWith returns all temperatures using provided deps (for testing).
+func GetAllTempsWith(nicIfaces string, d sensorDeps) (cpu, nics, board []TempReading) {
+	// Try lm-sensors first for CPU
+	if temps, err := getCPUFromSensors(d); err == nil && len(temps) > 0 {
+		cpu = temps
+	}
+
+	// Single hwmon scan for both CPU fallback and board temps
+	hwCPU, hwBoard, _ := scanHwmonTemps(d)
+	if len(cpu) == 0 {
+		cpu = hwCPU
+	}
+	board = hwBoard
+
 	for _, iface := range splitInterfaces(nicIfaces) {
-		if t, err := GetNICTemp(iface); err == nil {
+		if t, err := GetNICTempWith(iface, d); err == nil {
 			nics = append(nics, *t)
 		}
 	}
