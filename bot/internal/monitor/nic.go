@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -8,6 +9,10 @@ import (
 	"github.com/murata-lab/pervigil/bot/internal/notifier"
 	"github.com/murata-lab/pervigil/bot/internal/temperature"
 )
+
+// ErrSensorUnavailable is re-exported from temperature package
+// so that callers (e.g. main.go) do not need to import temperature directly.
+var ErrSensorUnavailable = temperature.ErrSensorUnavailable
 
 // NICState represents the monitor state
 type NICState string
@@ -150,11 +155,16 @@ func (m *NICMonitor) Check() error {
 	var maxTemp float64
 	var hottestIface string
 	var lastErr error
+	sensorUnavailable := false
 
 	for _, iface := range m.ifaces {
 		reading, err := m.tempReader.GetNICTemp(iface)
 		if err != nil {
-			lastErr = err
+			if errors.Is(err, temperature.ErrSensorUnavailable) {
+				sensorUnavailable = true
+			} else {
+				lastErr = err
+			}
 			continue
 		}
 		if reading.Value > maxTemp {
@@ -163,8 +173,13 @@ func (m *NICMonitor) Check() error {
 		}
 	}
 
-	// If no NIC temperature was read, return error
+	// If no NIC temperature was read, return appropriate error.
+	// Real errors take priority over sensor-unavailable so operators
+	// are alerted to actionable failures first.
 	if hottestIface == "" {
+		if sensorUnavailable && lastErr == nil {
+			return temperature.ErrSensorUnavailable
+		}
 		if lastErr != nil {
 			return fmt.Errorf("read temperature: %w", lastErr)
 		}

@@ -13,13 +13,14 @@ import (
 
 // RouterInfo contains comprehensive router system information.
 type RouterInfo struct {
-	Hostname string
-	Uptime   string
-	CPU      *CPUInfo
-	Memory   *MemInfo
-	NICs     []NICInfo
-	Disk     *DiskInfo
-	CPUTemps []temperature.TempReading
+	Hostname   string
+	Uptime     string
+	CPU        *CPUInfo
+	Memory     *MemInfo
+	NICs       []NICInfo
+	Disk       *DiskInfo
+	CPUTemps   []temperature.TempReading
+	BoardTemps []temperature.TempReading
 }
 
 // GetAllRouterInfo returns all router system information.
@@ -57,11 +58,8 @@ func GetAllRouterInfo() *RouterInfo {
 		log.Printf("[sysinfo] disk: %v", err)
 	}
 
-	// CPU temps
-	info.CPUTemps, err = temperature.GetCPUTemps()
-	if err != nil {
-		log.Printf("[sysinfo] cpu temps: %v", err)
-	}
+	// Temperatures — single hwmon scan via GetAllTemps (NIC results unused here)
+	info.CPUTemps, _, info.BoardTemps = temperature.GetAllTemps("")
 
 	return info
 }

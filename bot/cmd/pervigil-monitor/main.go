@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -107,8 +108,14 @@ func run() error {
 func runChecks(nic *monitor.NICMonitor, lg *monitor.LogMonitor, cost *monitor.CostMonitor, suppress *monitor.ErrorSuppressor) {
 	if nic != nil {
 		if err := nic.Check(); err != nil {
-			if msg, ok := suppress.Check("nic", err); ok {
-				log.Printf("NIC monitor error: %s", msg)
+			if errors.Is(err, monitor.ErrSensorUnavailable) {
+				if msg, ok := suppress.Check("nic_sensor", err); ok {
+					log.Printf("NIC sensor: %s", msg)
+				}
+			} else {
+				if msg, ok := suppress.Check("nic", err); ok {
+					log.Printf("NIC monitor error: %s", msg)
+				}
 			}
 		} else {
 			suppress.Check("nic", nil)

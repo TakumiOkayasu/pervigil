@@ -29,7 +29,7 @@ func cmdStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	hostname, _ := os.Hostname()
 	uptime := sysinfo.GetUptime()
 	ifaces := os.Getenv("NIC_INTERFACE")
-	cpu, nics := temperature.GetAllTemps(ifaces)
+	cpu, nics, _ := temperature.GetAllTemps(ifaces)
 
 	var sb strings.Builder
 	sb.WriteString("**システム状態**\n```\n")
@@ -172,6 +172,13 @@ func cmdInfo(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			tempStr = fmt.Sprintf(" %.1f°C", nic.Temp)
 		}
 		sb.WriteString(fmt.Sprintf("  %s: %s%s\n", nic.Name, state, tempStr))
+	}
+
+	if len(info.BoardTemps) > 0 {
+		sb.WriteString("\nBoard:\n")
+		for _, b := range info.BoardTemps {
+			sb.WriteString(fmt.Sprintf("  %-16s: %5.1f°C\n", b.Label, b.Value))
+		}
 	}
 
 	sb.WriteString("```")

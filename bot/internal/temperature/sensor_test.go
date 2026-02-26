@@ -1,16 +1,17 @@
 package temperature
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 )
 
 // mapSensorDeps returns command outputs, file contents, and glob results from maps
 type mapSensorDeps struct {
-	cmdOutput  map[string]string
-	cmdErr     map[string]error
-	files      map[string]string
-	globResult []string
+	cmdOutput   map[string]string
+	cmdErr      map[string]error
+	files       map[string]string
+	globResults map[string][]string // pattern → results
 }
 
 func (d *mapSensorDeps) RunCommand(name string, args ...string) ([]byte, error) {
@@ -35,7 +36,10 @@ func (d *mapSensorDeps) ReadFile(path string) ([]byte, error) {
 }
 
 func (d *mapSensorDeps) Glob(pattern string) ([]string, error) {
-	return d.globResult, nil
+	if d.globResults != nil {
+		return d.globResults[pattern], nil
+	}
+	return nil, nil
 }
 
 type testError struct {
@@ -117,7 +121,9 @@ func TestGetCPUTemps_FallbackToHwmon(t *testing.T) {
 		cmdErr: map[string]error{
 			"sensors -u": &testError{msg: "sensors not found"},
 		},
-		globResult: []string{"/sys/class/hwmon/hwmon0/temp1_input"},
+		globResults: map[string][]string{
+			"/sys/class/hwmon/hwmon*/temp*_input": {"/sys/class/hwmon/hwmon0/temp1_input"},
+		},
 		files: map[string]string{
 			"/sys/class/hwmon/hwmon0/name":        "coretemp",
 			"/sys/class/hwmon/hwmon0/temp1_label": "Core 0",
@@ -167,7 +173,9 @@ func TestGetNICTemp_FallbackToHwmon(t *testing.T) {
 			"ethtool -m eth1": &testError{msg: "no EEPROM"},
 			"ethtool -S eth1": &testError{msg: "no stats"},
 		},
-		globResult: []string{"/sys/class/net/eth1/device/hwmon/hwmon0/temp1_input"},
+		globResults: map[string][]string{
+			"/sys/class/net/eth1/device/hwmon/hwmon*/temp*_input": {"/sys/class/net/eth1/device/hwmon/hwmon0/temp1_input"},
+		},
 		files: map[string]string{
 			"/sys/class/net/eth1/device/hwmon/hwmon0/temp1_input": "70000", // 70°C
 		},
@@ -180,5 +188,154 @@ func TestGetNICTemp_FallbackToHwmon(t *testing.T) {
 
 	if temp.Value != 70.0 {
 		t.Errorf("expected NIC temp 70.0 from hwmon fallback, got %f", temp.Value)
+	}
+}
+
+func TestGetNICTemp_AllFailed_SentinelError(t *testing.T) {
+	// ethtool全失敗 + hwmon見つからない → ErrSensorUnavailable
+	deps := &mapSensorDeps{
+		cmdErr: map[string]error{
+			"ethtool -m eth1": &testError{msg: "no EEPROM"},
+			"ethtool -S eth1": &testError{msg: "no stats"},
+		},
+		// globResults に NIC hwmon パスなし → 空結果
+	}
+
+	_, err := GetNICTempWith("eth1", deps)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, ErrSensorUnavailable) {
+		t.Errorf("expected ErrSensorUnavailable, got %v", err)
+	}
+}
+
+func TestGetBoardTemps_PCH(t *testing.T) {
+	deps := &mapSensorDeps{
+		globResults: map[string][]string{
+			"/sys/class/hwmon/hwmon*/temp*_input": {
+				"/sys/class/hwmon/hwmon0/temp1_input",
+			},
+		},
+		files: map[string]string{
+			"/sys/class/hwmon/hwmon0/name":        "pch_cannonlake",
+			"/sys/class/hwmon/hwmon0/temp1_input": "52000",
+		},
+	}
+
+	temps, err := GetBoardTempsWith(deps)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(temps) != 1 {
+		t.Fatalf("expected 1 board temp, got %d", len(temps))
+	}
+	if temps[0].Label != "pch_cannonlake" {
+		t.Errorf("expected label 'pch_cannonlake', got '%s'", temps[0].Label)
+	}
+	if temps[0].Value != 52.0 {
+		t.Errorf("expected temp 52.0, got %f", temps[0].Value)
+	}
+}
+
+func TestGetBoardTemps_ExcludesCPU(t *testing.T) {
+	deps := &mapSensorDeps{
+		globResults: map[string][]string{
+			"/sys/class/hwmon/hwmon*/temp*_input": {
+				"/sys/class/hwmon/hwmon0/temp1_input",
+				"/sys/class/hwmon/hwmon1/temp1_input",
+				"/sys/class/hwmon/hwmon2/temp1_input",
+			},
+		},
+		files: map[string]string{
+			"/sys/class/hwmon/hwmon0/name":        "pch_cannonlake",
+			"/sys/class/hwmon/hwmon0/temp1_input": "52000",
+			"/sys/class/hwmon/hwmon1/name":        "coretemp",
+			"/sys/class/hwmon/hwmon1/temp1_input": "45000",
+			"/sys/class/hwmon/hwmon2/name":        "k10temp",
+			"/sys/class/hwmon/hwmon2/temp1_input": "50000",
+		},
+	}
+
+	temps, err := GetBoardTempsWith(deps)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(temps) != 1 {
+		t.Fatalf("expected 1 board temp (excluding CPU), got %d", len(temps))
+	}
+	if temps[0].Label != "pch_cannonlake" {
+		t.Errorf("expected label 'pch_cannonlake', got '%s'", temps[0].Label)
+	}
+}
+
+func TestGetAllTemps_WithBoard(t *testing.T) {
+	deps := &mapSensorDeps{
+		cmdOutput: map[string]string{
+			"sensors -u": `coretemp-isa-0000
+Core 0:
+  temp2_input: 45.000
+`,
+		},
+		cmdErr: map[string]error{
+			"ethtool -m eth1": &testError{msg: "no EEPROM"},
+			"ethtool -S eth1": &testError{msg: "no stats"},
+		},
+		globResults: map[string][]string{
+			"/sys/class/hwmon/hwmon*/temp*_input": {
+				"/sys/class/hwmon/hwmon0/temp1_input",
+			},
+			// NIC hwmon: empty → triggers ErrSensorUnavailable
+		},
+		files: map[string]string{
+			"/sys/class/hwmon/hwmon0/name":        "pch_cannonlake",
+			"/sys/class/hwmon/hwmon0/temp1_input": "52000",
+		},
+	}
+
+	cpu, nics, board := GetAllTempsWith("eth1", deps)
+
+	if len(cpu) != 1 {
+		t.Fatalf("expected 1 CPU temp, got %d", len(cpu))
+	}
+	if cpu[0].Value != 45.0 {
+		t.Errorf("expected CPU temp 45.0, got %f", cpu[0].Value)
+	}
+	if len(nics) != 0 {
+		t.Errorf("expected 0 NIC temps (sensor unavailable), got %d", len(nics))
+	}
+	if len(board) != 1 {
+		t.Fatalf("expected 1 board temp, got %d", len(board))
+	}
+	if board[0].Label != "pch_cannonlake" {
+		t.Errorf("expected board label 'pch_cannonlake', got '%s'", board[0].Label)
+	}
+	if board[0].Value != 52.0 {
+		t.Errorf("expected board temp 52.0, got %f", board[0].Value)
+	}
+}
+
+func TestGetBoardTemps_SkipsEmptyName(t *testing.T) {
+	deps := &mapSensorDeps{
+		globResults: map[string][]string{
+			"/sys/class/hwmon/hwmon*/temp*_input": {
+				"/sys/class/hwmon/hwmon0/temp1_input",
+				"/sys/class/hwmon/hwmon1/temp1_input",
+			},
+		},
+		files: map[string]string{
+			"/sys/class/hwmon/hwmon0/name":        "pch_cannonlake",
+			"/sys/class/hwmon/hwmon0/temp1_input": "52000",
+			// hwmon1 has no name file → empty string
+			"/sys/class/hwmon/hwmon1/temp1_input": "99000",
+		},
+	}
+
+	temps, err := GetBoardTempsWith(deps)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(temps) != 1 {
+		t.Fatalf("expected 1 board temp (skipping empty name), got %d", len(temps))
 	}
 }
