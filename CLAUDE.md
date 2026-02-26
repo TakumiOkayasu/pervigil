@@ -46,8 +46,8 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o pervigil-bot ./cmd/pervigil-bo
 ### VyOSデプロイ
 
 ```bash
-scp bot/pervigil-monitor vyos@<IP>:/config/scripts/pervigil/
-scp bot/pervigil-bot vyos@<IP>:/config/scripts/pervigil/
+scp bot/pervigil-monitor vyos@<IP>:/config/pervigil/
+scp bot/pervigil-bot vyos@<IP>:/config/pervigil/
 ```
 
 ## 環境変数 (pervigil-monitor)

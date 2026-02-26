@@ -10,12 +10,13 @@ bot/
 │   ├── pervigil-bot/       # Discord Bot
 │   └── pervigil-monitor/   # 監視デーモン
 └── internal/
+    ├── anthropic/          # Anthropic Admin APIクライアント
     ├── config/             # 設定読み込み
     ├── handler/            # Botコマンドハンドラ
     ├── sysinfo/            # システム情報取得
     ├── temperature/        # 温度センサー
     ├── notifier/           # Discord Webhook通知
-    └── monitor/            # NIC/ログ監視ロジック
+    └── monitor/            # NIC/ログ/コスト監視ロジック
 ```
 
 ## ビルド
@@ -54,6 +55,7 @@ cat > /config/pervigil/.env << 'EOF'
 DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
 NIC_INTERFACE="eth1"
 BOT_TOKEN="your-discord-bot-token"
+ANTHROPIC_ADMIN_KEY="your-anthropic-admin-key"
 EOF
 
 # 起動
@@ -87,6 +89,7 @@ systemctl status pervigil-monitor pervigil-bot
 | ------ | ------ |
 | NIC温度監視 | FSMベースの状態管理、速度制限制御 |
 | ログ監視 | パターンマッチ、除外ルール対応 |
+| コスト監視 | Anthropic API利用コスト監視、予算閾値アラート |
 | Discord通知 | Webhook経由でリアルタイム通知 |
 
 ### NIC温度閾値
@@ -107,6 +110,12 @@ systemctl status pervigil-monitor pervigil-bot
 | CHECK_INTERVAL | No | 60 | チェック間隔(秒) |
 | STATE_FILE | No | /tmp/pervigil-state | 状態ファイル |
 | LOG_FILE | No | /var/log/syslog | 監視ログ |
+| ANTHROPIC_ADMIN_KEY | No | - | Anthropic Admin APIキー |
+| COST_CHECK_INTERVAL | No | 3600 | コストチェック間隔(秒) |
+| DAILY_BUDGET_WARN | No | 5.0 | 日次警告閾値($) |
+| DAILY_BUDGET_CRIT | No | 10.0 | 日次危険閾値($) |
+| COST_STATE_FILE | No | /tmp/pervigil-cost-state | コスト状態ファイル |
+| ERROR_SUPPRESS_INTERVAL | No | 3600 | エラー抑制間隔(秒) |
 
 ## Discord Bot (pervigil-bot)
 
@@ -117,11 +126,12 @@ systemctl status pervigil-monitor pervigil-bot
 | /nic | NIC温度を表示 |
 | /temp | 全温度情報を表示 (CPU + NIC) |
 | /status | システム状態サマリー |
-| /cpu | CPU使用率とロードアベレージ |
-| /memory | メモリ使用状況 |
-| /network | 全NIC情報 (状態/速度/統計) |
-| /disk | ディスク使用状況 |
-| /info | ルーター全情報 |
+| /cpu | CPU使用率とロードアベレージを表示 |
+| /memory | メモリ使用状況を表示 |
+| /disk | ディスク使用状況を表示 |
+| /info | ルーター全情報を表示 |
+| /network | 全NIC情報を表示 |
+| /claude | Claude API利用状況を表示 |
 
 ### 環境変数 (Bot)
 
@@ -129,6 +139,9 @@ systemctl status pervigil-monitor pervigil-bot
 | ------ | ------ | ------ |
 | BOT_TOKEN | Yes | Discord Bot Token |
 | GUILD_ID | No | サーバーID (コマンド即時反映用) |
+| ANTHROPIC_ADMIN_KEY | No | Anthropic Admin APIキー |
+| DAILY_BUDGET_WARN | No | 日次警告閾値($) |
+| DAILY_BUDGET_CRIT | No | 日次危険閾値($) |
 
 ## 注意事項
 
